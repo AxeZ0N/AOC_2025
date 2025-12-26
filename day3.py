@@ -19,7 +19,7 @@ def get_max(bank):
     return my_max, indices
 
 
-with open("test_input.txt", "r", encoding="UTF-8") as f:
+with open("input.txt", "r", encoding="UTF-8") as f:
     inpt_raw = f.read().strip()
 
 battery_banks = [[x for x in y] for y in inpt_raw.split("\n")]
@@ -40,32 +40,83 @@ def from_index(battery, arr):
 def translate(battery, arr):
     return to_int(from_index(battery, arr))
 
-# New attempt.
-# Naive: Try all combinations of numbers and choose the largest.
-# Straight up completely impossible, even with rules its sum(2^100-n) possibilites
-# Keep track of already tried combos
-# Don't reuse indexes
+def search_range(bank, min, max, digit):
+    i = int(min)
+    while i in range(int(min), int(max)+1):
+        if bank[i] == str(digit): return i
+        else: i += 1
 
-# Sort out battery bank by largest digits.
-my_digits = {str(x):[] for x in range(1,10)}
-for i,d in enumerate(bat):
-    my_digits[d].append(i)
+    return None
 
-joltage = []
-reserved_index = lambda: 12-len(joltage)
-lm_index = 0
+# New attempt: Two little crawlers
 
-print(reserved_index())
+def battery_bank(bat):
 
-while len(joltage) < 12:
-    joltage = '1234'
-    print(reserved_index())
-    pass
+    joltage = []
+    reserved_index = lambda: len(bat) - (12-len(joltage))
+    # Avoid using the last 12, can tack them on in worst case scenario
+    l,r = 0, 0
+
+    # Cycle until a 12 digit number is found
+    while len(joltage) < 12:
+
+        d = 9
+        # Start each loop with the best digit
+        next_l = search_range(bat, l, reserved_index(), d)
+
+        # Might not find it
+        if next_l is None:
+            d_ = d
+            while d_ > 0:
+                # Decrement search digit and try again
+                next_l = search_range(bat, l, reserved_index(), d_)
+                # Again, might not find it
+                if next_l is None or bat[next_l] != str(d_): d_ -= 1
+                else: break
+
+        if next_l not in range(l, len(bat)):
+            raise ValueError(f"{next_l} not in l range!")
+
+        l = next_l
+
+        # Start the next search at one past the prev digit
+        next_r = l + 1
+        next_r = search_range(bat, l+1, reserved_index(), 9)
+
+        # Might not find 9,
+        if next_r is None:
+            d_ = d
+            while d_ > 0:
+                # Decrement search digit and try again
+                next_r = search_range(bat, l, reserved_index(), d_)
+                # Again, might not find it
+                if next_r is None or bat[next_r] != str(d_): d_ -= 1
+                else: break
 
 
+        if next_r not in range(l, len(bat)):
+            raise ValueError(f"{next_r} not in r range!")
+
+        r = next_r
+
+        joltage += [l]
+
+        #print([bat[x] for x in range(l,r+1)])
+
+        int_joltage = translate(bat, joltage)
+        #print(list(map(bat.__getitem__, joltage)))
+
+        l += 1
+
+    j = translate(bat, joltage)
+
+    return j
+
+jolts = 0
+for bat in battery_banks:
+    j = battery_bank(bat)
+    print(j)
+    jolts += j
 
 
-int_joltage = translate(bat, joltage)
-print(len(joltage))
-print(joltage)
-print(int_joltage)
+print(jolts)
