@@ -3,152 +3,114 @@
 
 import re
 
-with open('test_input.txt', 'r') as f:
+with open('input.txt', 'r') as f:
     inpt = [x.strip('\n') for x in f.readlines()]
 
 #for x in inpt: print(x)
 
-# might be easier to simulate one line at a time?
-# heap?
-# for each layer
-# running queue:
-# ...
-# ..^ -> +1 split (1)
-# .^. -> +2 split (2)
-# ^.^ -> +3 split (3)
-# ^.. -> +1 split (3)
-# ...
+def serialize_inpt(inpt):
+    output = []
+    for line in inpt:
+        output += [[ch for ch in line]]
+    return output
 
-# State machine?
-# Read 2 bits
-# .^.: 2
-# ^.^: 3
+def print_tree(tree):
+    for line in tree:
+        print(''.join(line))
 
-# Build next line bit by bit?
-# S -> |
-# .^. -> |.|
-# ^.^ -> .|.
-
-# What's needed to generate a new line?
-# Previous line, to tell if a laser even hits a splitter
-#   How to get prev line: take from tree
-# Current line, must handle splitters
-#   Hot to get curr line: take from inpt
-# Dict of symbol pairs and their evolutions
-
-
-# This is looking suspiciously like binary addition
-# TX:
-# Input: line n-1, n
-# Returns: tx_line1_line2_line, line n+1
-# Algo:
-#   Move unobstructed lasers in line n-1 at pos i to line n at pos i
-#   Move lasers that hit splitters in line n from line n-1 at pos i to line n at pos i-1, i+1
-#   Move all lasers down to row n+1
-# Return lines n and n+1
-
-
-# Algo:
-# Start state: empty tree
-# tree = lines 0,1 where line 1 == line 0 replace(S,|)
-# i = 2
-# TX(tree[-1], inpt[i]) -> Next line
-# tree.append(Next line)
-# i += 2
-# repeat
-
-# The simulation worked, but the counting didn't
-# Going to try bottom up counting
-# Parse two lines at a time?
-# Start at len(inpt),0:
-# When inpt[i][j] == |, get rid of it, add one to the counter
-# Continue until line consumed
-# Repeat
-
-from re import findall
-from itertools import batched, pairwise
-
-
-def tx_line1_line2(line1,line2):
-    ret = list(line1)
-    i = 0
-    while i < len(line1):
-        ch1,ch2 = line1[i],line2[i]
-        match ch1,ch2:
-            case '|','^':
-                ret[i-1:i+1] = ['|','^','|'] # Replace 3 chars
-                ret = ret[:-1] # Delete last char
-                i += 1 # Skip next char
-            case _:
-                ret[i] = ch1
-        i += 1
-
-    a = tx_line2_line3(''.join(ret))
-
-    print(''.join(ret), line2)
-
-    return (''.join(ret), a)
-
-def tx_line2_line3(line1):
-    ret = list(line1)
-    i = 0
-    while i < len(line1):
-        ch1 = line1[i]
-        if ch1 == '|':
-            ret[i] = '|'
-        else:
-            ret[i] = '.'
-        i += 1
-
-    return ''.join(ret)
-
-sline = inpt[0].replace('S','|')
-tree = [inpt[0],sline]
-
-i = 2
-while i < len(inpt):
-    a,b = tx_line1_line2(tree[-1],inpt[i])
-    input()
-    tree += [a,b]
-    i += 2
-
-for x in tree: print(x)
-print()
-
-a = """
-.......S.......
-.......|.......
-......|^|......
-......|.|......
-.....|^|^|.....
-.....|.|.|.....
-....|^|^|^|....
-....|.|.|.|....
-...|^|^|||^|...
-...|.|.|||.|...
-..|^|^|||^|^|..
-..|.|.|||.|.|..
-.|^|||^||.||^|.
-.|.|||.||.||.|.
-|^|^|^|^|^|||^|
-|.|.|.|.|.|||.|
-"""
-
-print('a', 'tree')
-for i,x in enumerate(zip(a.split(),tree)):
-    one, two = x
-    print(one,two)
-
-i = len(inpt)-1
+global splits
 splits = 0
-while i > 0:
-    a = list(tree[i-1])
-    b = list(tree[i])
-    while len(a):
-        ch1,ch2 = a.pop(0), b.pop(0)
-        if ch1 == ch2 == '|':
+
+def navigate_tree(inpt, start_coords):
+    s1,s2 = start_coords
+    start = inpt[s1][s2]
+
+    if start == 'S':
+        inpt[s1+1][s2] = '|'
+        return inpt
+
+    assert start == '|'
+
+    n1,n2 = (s1+1,s2)
+
+    next_pos = inpt[n1][n2]
+    match next_pos:
+        case '.'|'|': 
+            inpt[n1][n2] = '|'
+        case '^': 
+            inpt[n1][n2-1] = '|'
+            inpt[n1][n2+1] = '|'
+            global splits
             splits += 1
-    print(splits)
-    i -= 2
+        case _: raise ValueError(next_pos)
+
+    return inpt
+
+a = serialize_inpt(inpt)
+
+i,j = 0,0
+while i < len(a)-1:
+    if a[i][j] in ('|','S'):
+        a = navigate_tree(a, (i,j))
+        #print_tree(a)
+
+    if j >= len(a[i])-1:
+        i,j = i+1, 0
+    else:
+        j += 1
+
+print_tree(a)
+from collections import Counter
+from itertools import chain
 
 print(splits)
+print(f"Amt of '^':{Counter(chain(*a))['|']}")
+
+# Need to generate all possible paths from Top to Bottom, only following '|'
+# Recursive is most straightforward
+
+# Exit case:
+# Laser has reached the end - return coords
+# Base case 1/2:
+# Laser advances without obstruction - recurse with next coords
+# Base case 2/2:
+# Laser hits splitter - recurse with left and right next coords respectively
+
+# Input: starting coords
+# Output: list of coords from start to end representing that path of the laser
+
+# Looks like the exponential scaling is stronger than my recursion.
+# Clearly there has to be a linear formula
+# Maybe part 2 has less strict tracing?
+# Part 1 test ans was num '^' - 1
+
+import functools
+
+
+def trace(start, tree):
+    @functools.lru_cache
+    def recurse(start):
+        i,j = start
+        count = 0
+
+        if tree[i][j] != '|':
+            return 0
+
+        if i >= len(tree)-1:
+            return 1
+
+        match tree[i+1][j]:
+            case '|':
+                count += recurse((i+1,j))
+
+            case '^':
+                count += recurse((i+1,j-1))
+                count += recurse((i+1,j+1))
+
+        return count
+
+    return recurse(start)
+
+start = (1,70)
+trace = trace(start,a)
+print(trace)
