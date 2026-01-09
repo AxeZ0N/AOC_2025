@@ -8,60 +8,40 @@
 # Part 2, input forms an n-gon, largest possible rectangle within n-gon
 # Going to write a visualizer first.
 # Ok, not super useful, too big. Crashed my chromebook
+# Need a polygon collision/contains algorithm
+# Raycast points on the same x or same y, if any boundaries crossed: fail
 
-from itertools import pairwise
+from itertools import pairwise, combinations
+import numpy
+import shapely
+from shapely import plotting
+from shapely import Polygon
+from matplotlib import pyplot as plt
 
 file = 'input.txt'
-tiles = []
-with open(file, 'r') as f:
-    for line in f.readlines():
-        tiles += [tuple(int(x) for x in line.strip().split(','))]
+x,y = numpy.loadtxt(file,delimiter=',',unpack=True)
 
-#tiles.sort()
+tiles = [(int(c),int(r)) for c,r in zip(x,y)]
 
-def draw_line(p1,p2,graph):
-    c1,r1 = p1
-    c2,r2 = p2
+p = Polygon(tiles)
 
-    draw_row = c1 == c2
-    draw_col = r1 == r2
-    
-    if draw_row and not draw_col:
-        dir_ = 'row'
-        direction = -1 if r1 > r2 else 1
-    elif draw_col and not draw_row:
-        dir_ = 'col'
-        direction = -1 if c1 > c2 else 1
+max_p1, max_p2 = 0,0
 
-    print(f"Plane: {dir_}, direction: {direction}")
-    while (c1,r1) != p2:
-        print(c1,r1,p2)
-        graph[r1][c1] = 'X'
-        if dir_ == 'row':
-            r1 += direction
-        elif dir_ == 'col':
-            c1 += direction
 
-    return graph
+for c1,c2 in combinations(tiles,2):
+    x1,y1 = c1
+    x2,y2 = c2
+    x_min,x_max = min(x1,x2), max(x1,x2)
+    y_min,y_max = min(y1,y2), max(y1,y2)
 
-def find_area(corner1,corner2):
-    # Find area of rectangle from two diagonal corners
-    (r1,c1),(r2,c2 ) = corner1,corner2
+    box = shapely.box(x_min,y_min,x_max,y_max)
 
-    side1 = abs(r2-r1)+1
-    side2 = abs(c2-c1)+1
+    area = (x_max-x_min + 1) * (y_max-y_min+1)
+    if p.contains(box):
+        max_p2 = max(area, max_p2)
 
-    return side1 * side2
+    max_p1 = max(area, max_p1)
 
-areas = []
-inner_tiles = tiles.copy()
 
-for t1 in tiles:
-    for t2 in inner_tiles:
-        if t1 == t2: continue
-        areas += [(find_area(t1,t2), (t1,t2))]
-    inner_tiles.pop(0)
+print(max_p1, max_p2)
 
-areas.sort()
-
-print(areas[-1])
